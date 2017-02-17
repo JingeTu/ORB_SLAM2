@@ -160,7 +160,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
 {
     const vector<MapPoint*> vpMapPointsKF = pKF->GetMapPointMatches();
 
-    vpMapPointMatches = vector<MapPoint*>(F.N,static_cast<MapPoint*>(NULL));
+    vpMapPointMatches = vector<MapPoint*>(F.N,static_cast<MapPoint*>(NULL)); // -- MapPoints in `pKF` correspond to Features in `F`.
 
     const DBoW2::FeatureVector &vFeatVecKF = pKF->mFeatVec;
 
@@ -182,9 +182,9 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
         if(KFit->first == Fit->first)
         {
             const vector<unsigned int> vIndicesKF = KFit->second;
-            const vector<unsigned int> vIndicesF = Fit->second;
+            const vector<unsigned int> vIndicesF = Fit->second; // -- In the same node of the tree.
 
-            for(size_t iKF=0; iKF<vIndicesKF.size(); iKF++)
+            for(size_t iKF=0; iKF<vIndicesKF.size(); iKF++) // -- For each KeyFrame's MapPoint.
             {
                 const unsigned int realIdxKF = vIndicesKF[iKF];
 
@@ -196,11 +196,11 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
                 if(pMP->isBad())
                     continue;                
 
-                const cv::Mat &dKF= pKF->mDescriptors.row(realIdxKF);
+                const cv::Mat &dKF= pKF->mDescriptors.row(realIdxKF); // -- KeyFrame MapPoint's descriptor.
 
-                int bestDist1=256;
+                int bestDist1=256; // -- The minimum dist.
                 int bestIdxF =-1 ;
-                int bestDist2=256;
+                int bestDist2=256; // -- The second minimum dist.
 
                 for(size_t iF=0; iF<vIndicesF.size(); iF++)
                 {
@@ -209,7 +209,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
                     if(vpMapPointMatches[realIdxF])
                         continue;
 
-                    const cv::Mat &dF = F.mDescriptors.row(realIdxF);
+                    const cv::Mat &dF = F.mDescriptors.row(realIdxF); // -- Frame MapPoint's descriptor.
 
                     const int dist =  DescriptorDistance(dKF,dF);
 
@@ -227,8 +227,8 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
 
                 if(bestDist1<=TH_LOW)
                 {
-                    if(static_cast<float>(bestDist1)<mfNNratio*static_cast<float>(bestDist2))
-                    {
+                    if(static_cast<float>(bestDist1)<mfNNratio*static_cast<float>(bestDist2)) // -- If the minimum dist is less than a ratio(0.7) of second minimum dist.
+                    { // -- The matched point must be outstanding than the second matched point.
                         vpMapPointMatches[bestIdxF]=pMP;
 
                         const cv::KeyPoint &kp = pKF->mvKeysUn[realIdxKF];
@@ -403,7 +403,7 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 }
 
 int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
-{
+{ // -- F1: mInitialFrame, F2: mCurrentFrame
     int nmatches=0;
     vnMatches12 = vector<int>(F1.mvKeysUn.size(),-1);
 

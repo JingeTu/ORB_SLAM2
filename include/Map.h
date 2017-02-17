@@ -35,7 +35,7 @@ namespace ORB_SLAM2
 class MapPoint;
 class KeyFrame;
 
-class Map
+class Map // -- Map is a structure to store points to all MapPoints and KeyFrames.
 {
 public:
     Map();
@@ -70,7 +70,7 @@ protected:
     std::set<MapPoint*> mspMapPoints;
     std::set<KeyFrame*> mspKeyFrames;
 
-    std::vector<MapPoint*> mvpReferenceMapPoints;
+    std::vector<MapPoint*> mvpReferenceMapPoints; // -- This member variable is only for store pointers to MapPoints that MapDrawer will processed.
 
     long unsigned int mnMaxKFid;
 

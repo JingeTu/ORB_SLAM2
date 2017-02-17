@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     cv::FileStorage fSettings(argv[2], cv::FileStorage::READ); // Examples/Monocular/TUM1.yaml
 
     // int nFeatures = fSettings["ORBextractor.nFeatures"];
-    int nFeatures = 100;
+    int nFeatures = 1000;
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
     int nLevels = fSettings["ORBextractor.nLevels"];
     int fIniThFAST = fSettings["ORBextractor.iniThFAST"];

@@ -46,6 +46,9 @@ class Tracking;
 class LocalMapping;
 class LoopClosing;
 
+/**
+ * @brief      Class for the whole system entry.
+ */
 class System
 {
 public:

@@ -22,5 +22,7 @@ Vocabulary/ORBvoc.txt
 build/
 *~
 lib/
+CameraTrajectory.txt
 .DS_Store
-
+data/
+doc/

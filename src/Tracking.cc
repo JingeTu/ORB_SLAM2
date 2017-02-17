@@ -294,28 +294,28 @@ void Tracking::Track()
         bool bOK;
 
         // Initial camera pose estimation using motion model or relocalization (if tracking is lost)
-        if(!mbOnlyTracking)
+        if(!mbOnlyTracking) // -- There are two modes, OnlyTracking or SLAM. SLAM mode is the ordinary mode.
         {
             // Local Mapping is activated. This is the normal behaviour, unless
             // you explicitly activate the "only tracking" mode.
 
-            if(mState==OK)
+            if(mState==OK) // -- The last Tracking state.
             {
                 // Local Mapping might have changed some MapPoints tracked in last frame
-                CheckReplacedInLastFrame();
+                CheckReplacedInLastFrame(); // -- `lastFrame`'s MapPoints.
 
-                if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2) // -- Unable to use motion model because of velocity is empty. Or too close to last relocalization frame.
-                {
+                if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
+                { // -- Unable to use motion model because of velocity is empty. Or too close to last relocalization frame.
                     bOK = TrackReferenceKeyFrame();
                 }
-                else
+                else // -- Prefer to using Motion Model.
                 {
                     bOK = TrackWithMotionModel();
                     if(!bOK)
                         bOK = TrackReferenceKeyFrame();
                 }
             }
-            else
+            else // If last tracking is not OK, we just relocalization.
             {
                 bOK = Relocalization();
             }
@@ -421,12 +421,12 @@ void Tracking::Track()
         if(bOK)
         {
             // Update motion model
-            if(!mLastFrame.mTcw.empty())
-            {
+            if(!mLastFrame.mTcw.empty()) // -- If the check is lost.
+            { // -- This is easy, no use of time. Because of the same time interval between frames. l: lastFrame, c: currentframe, Tcl = Tcw * Twl = Tcw * Tlw^{-1}.
                 cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
                 mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
                 mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
-                mVelocity = mCurrentFrame.mTcw*LastTwc;
+                mVelocity = mCurrentFrame.mTcw*LastTwc; // -- [5] Formula(8)
             }
             else
                 mVelocity = cv::Mat();
@@ -488,7 +488,7 @@ void Tracking::Track()
     // Store frame pose information to retrieve the complete camera trajectory afterwards.
     if(!mCurrentFrame.mTcw.empty())
     {
-        cv::Mat Tcr = mCurrentFrame.mTcw*mCurrentFrame.mpReferenceKF->GetPoseInverse();
+        cv::Mat Tcr = mCurrentFrame.mTcw*mCurrentFrame.mpReferenceKF->GetPoseInverse(); // -- Reference KeyFrame to Current Frame.
         mlRelativeFramePoses.push_back(Tcr);
         mlpReferences.push_back(mpReferenceKF);
         mlFrameTimes.push_back(mCurrentFrame.mTimeStamp);
@@ -539,7 +539,7 @@ void Tracking::StereoInitialization()
 
         cout << "New map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
-        mpLocalMapper->InsertKeyFrame(pKFini);
+        mpLocalMapper->InsertKeyFrame(pKFini); // -- Insert into the local map's keyframe queue (mlNewKeyFrames). Wait to be added to LocalMap.
 
         mLastFrame = Frame(mCurrentFrame);
         mnLastKeyFrameId=mCurrentFrame.mnId;
@@ -552,7 +552,7 @@ void Tracking::StereoInitialization()
 
         mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
-        mpMap->mvpKeyFrameOrigins.push_back(pKFini);
+        mpMap->mvpKeyFrameOrigins.push_back(pKFini); // -- Map structure that stores the pointers to all KeyFrames and MapPoints.
 
         mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
@@ -772,7 +772,7 @@ bool Tracking::TrackReferenceKeyFrame()
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw); // -- Use the last frame's pose as a initial pose to optimize.
 
-    Optimizer::PoseOptimization(&mCurrentFrame);
+    Optimizer::PoseOptimization(&mCurrentFrame); // -- Motion-only bundle adjustment.
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -787,8 +787,8 @@ bool Tracking::TrackReferenceKeyFrame()
                 mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
                 mCurrentFrame.mvbOutlier[i]=false;
                 pMP->mbTrackInView = false;
-                pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-                nmatches--;
+                pMP->mnLastFrameSeen = mCurrentFrame.mnId; // -- This is a outlier MapPoint for CurrentFrame, why set it's `mnLastFrameSeen` as CurrentFrame?
+                // nmatches--;
             }
             else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
                 nmatchesMap++;
@@ -804,7 +804,7 @@ void Tracking::UpdateLastFrame()
     KeyFrame* pRef = mLastFrame.mpReferenceKF;
     cv::Mat Tlr = mlRelativeFramePoses.back();
 
-    mLastFrame.SetPose(Tlr*pRef->GetPose());
+    mLastFrame.SetPose(Tlr*pRef->GetPose()); // -- Function ends here, while SLAM mode.
 
     if(mnLastKeyFrameId==mLastFrame.mnId || mSensor==System::MONOCULAR || !mbOnlyTracking)
         return;
@@ -877,14 +877,14 @@ bool Tracking::TrackWithMotionModel()
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
     // Project points seen in previous frame
-    int th;
+    int th; // -- Radius of search area.
     if(mSensor!=System::STEREO)
         th=15;
     else
         th=7;
     int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
 
-    // If few matches, uses a wider window search
+    // If few matches, uses a wider window search // -- Double the radius.
     if(nmatches<20)
     {
         fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
