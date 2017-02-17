@@ -144,7 +144,7 @@ void LocalMapping::ProcessNewKeyFrame()
         MapPoint* pMP = vpMapPointMatches[i];
         if(pMP)
         {
-            if(!pMP->isBad())
+            if(!pMP->isBad()) // -- The map point is not bad means it is in the map, not deleted (lazy deletion).
             {
                 if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
                 {
@@ -248,7 +248,7 @@ void LocalMapping::CreateNewMapPoints()
 
         if(!mbMonocular)
         {
-            if(baseline<pKF2->mb)
+            if(baseline<pKF2->mb) // -- If baseline is short than the stereo baseline, just return.
             continue;
         }
         else
@@ -256,7 +256,7 @@ void LocalMapping::CreateNewMapPoints()
             const float medianDepthKF2 = pKF2->ComputeSceneMedianDepth(2);
             const float ratioBaselineDepth = baseline/medianDepthKF2;
 
-            if(ratioBaselineDepth<0.01)
+            if(ratioBaselineDepth<0.01) // -- Baseline must be large than 0.01 median map points depth.
                 continue;
         }
 
@@ -313,11 +313,11 @@ void LocalMapping::CreateNewMapPoints()
             else if(bStereo2)
                 cosParallaxStereo2 = cos(2*atan2(pKF2->mb/2,pKF2->mvDepth[idx2]));
 
-            cosParallaxStereo = min(cosParallaxStereo1,cosParallaxStereo2);
+            cosParallaxStereo = min(cosParallaxStereo1,cosParallaxStereo2); // -- Cosine of intersection angle, the larger angle is better. 
 
-            cv::Mat x3D;
+            cv::Mat x3D; // -- Choose the largest angle determine the map point's world coordinate.
             if(cosParallaxRays<cosParallaxStereo && cosParallaxRays>0 && (bStereo1 || bStereo2 || cosParallaxRays<0.9998))
-            {
+            { // -- Two frame's intersection angle should be larger than the single frame's intersection angle.
                 // Linear Triangulation Method
                 cv::Mat A(4,4,CV_32F);
                 A.row(0) = xn1.at<float>(0)*Tcw1.row(2)-Tcw1.row(0);
@@ -337,7 +337,7 @@ void LocalMapping::CreateNewMapPoints()
                 x3D = x3D.rowRange(0,3)/x3D.at<float>(3);
 
             }
-            else if(bStereo1 && cosParallaxStereo1<cosParallaxStereo2)
+            else if(bStereo1 && cosParallaxStereo1<cosParallaxStereo2) // -- If the two frame's intersection angle is less than two single angles, choose the larger one to unproject.
             {
                 x3D = mpCurrentKeyFrame->UnprojectStereo(idx1);                
             }

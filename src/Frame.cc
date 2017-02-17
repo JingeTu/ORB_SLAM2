@@ -61,7 +61,7 @@ Frame::Frame(const Frame &frame)
 Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractorLeft),mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
      mpReferenceKF(static_cast<KeyFrame*>(NULL))
-{
+{ // -- Constructor for stereo cameras.
     // Frame ID
     mnId=nNextId++;
 
@@ -119,7 +119,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
      mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth)
-{
+{ // -- Constructor for RGB-D cameras.
     // Frame ID
     mnId=nNextId++;
 
@@ -133,7 +133,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
     mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
 
     // ORB extraction
-    ExtractORB(0,imGray);
+    ExtractORB(0,imGray); // -- Extract ORB features. `mvKeys` is the key points vector.
 
     N = mvKeys.size();
 
@@ -144,11 +144,11 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 
     ComputeStereoFromRGBD(imDepth);
 
-    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
-    mvbOutlier = vector<bool>(N,false);
+    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL)); // -- Keypoints may be correspond to map points in the local map.
+    mvbOutlier = vector<bool>(N,false); // -- The keypoints may have some outliers.
 
     // This is done only for the first Frame (or after a change in the calibration)
-    if(mbInitialComputations)
+    if(mbInitialComputations) // -- The undistorted image minimum bounded box.
     {
         ComputeImageBounds(imGray);
 
@@ -165,7 +165,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
         mbInitialComputations=false;
     }
 
-    mb = mbf/fx;
+    mb = mbf/fx; // -- the base line's length
 
     AssignFeaturesToGrid();
 }
@@ -419,7 +419,7 @@ void Frame::UndistortKeyPoints()
 
     // Undistort points
     mat=mat.reshape(2);
-    cv::undistortPoints(mat,mat,mK,mDistCoef,cv::Mat(),mK);
+    cv::undistortPoints(mat,mat,mK,mDistCoef,cv::Mat(),mK); // mK 3*3
     mat=mat.reshape(1);
 
     // Fill undistorted keypoint vector
@@ -658,7 +658,7 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
         if(d>0)
         {
             mvDepth[i] = d;
-            mvuRight[i] = kpU.pt.x-mbf/d;
+            mvuRight[i] = kpU.pt.x-mbf/d; // -- U_L- U_R = baseline * fx / d (mbf = baseline * fx)
         }
     }
 }

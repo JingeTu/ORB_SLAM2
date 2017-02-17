@@ -209,7 +209,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
     mImGray = imRGB;
     cv::Mat imDepth = imD;
 
-    if(mImGray.channels()==3)
+    if(mImGray.channels()==3) // -- Convert RGB(BGR) image into gray image.
     {
         if(mbRGB)
             cvtColor(mImGray,mImGray,CV_RGB2GRAY);
@@ -224,7 +224,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
 
-    if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
+    if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F) // -- Depth may be scaled. If the scale factor is not essentially equal to 1.0, do the scale.
         imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
 
     mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
@@ -304,7 +304,7 @@ void Tracking::Track()
                 // Local Mapping might have changed some MapPoints tracked in last frame
                 CheckReplacedInLastFrame();
 
-                if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
+                if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2) // -- Unable to use motion model because of velocity is empty. Or too close to last relocalization frame.
                 {
                     bOK = TrackReferenceKeyFrame();
                 }
@@ -350,22 +350,22 @@ void Tracking::Track()
                     // We compute two camera poses, one from motion model and one doing relocalization.
                     // If relocalization is sucessfull we choose that solution, otherwise we retain
                     // the "visual odometry" solution.
-
+                    // -- Prefer to using relocalization result.
                     bool bOKMM = false;
                     bool bOKReloc = false;
                     vector<MapPoint*> vpMPsMM;
                     vector<bool> vbOutMM;
                     cv::Mat TcwMM;
-                    if(!mVelocity.empty())
+                    if(!mVelocity.empty()) // -- Track with motion model. "Visual Odometry" means motion model.
                     {
                         bOKMM = TrackWithMotionModel();
                         vpMPsMM = mCurrentFrame.mvpMapPoints;
                         vbOutMM = mCurrentFrame.mvbOutlier;
                         TcwMM = mCurrentFrame.mTcw.clone();
                     }
-                    bOKReloc = Relocalization();
+                    bOKReloc = Relocalization(); // -- Relocalization.
 
-                    if(bOKMM && !bOKReloc)
+                    if(bOKMM && !bOKReloc) // -- If motion model is ok and relocalization failed.
                     {
                         mCurrentFrame.SetPose(TcwMM);
                         mCurrentFrame.mvpMapPoints = vpMPsMM;
@@ -382,7 +382,7 @@ void Tracking::Track()
                             }
                         }
                     }
-                    else if(bOKReloc)
+                    else if(bOKReloc) // -- If relocalization is ok. 
                     {
                         mbVO = false;
                     }
@@ -523,7 +523,7 @@ void Tracking::StereoInitialization()
         for(int i=0; i<mCurrentFrame.N;i++)
         {
             float z = mCurrentFrame.mvDepth[i];
-            if(z>0)
+            if(z>0) // -- Add all key points that z is larger than 0 into the map.
             {
                 cv::Mat x3D = mCurrentFrame.UnprojectStereo(i);
                 MapPoint* pNewMP = new MapPoint(x3D,pKFini,mpMap);
@@ -563,7 +563,7 @@ void Tracking::StereoInitialization()
 void Tracking::MonocularInitialization()
 {
 
-    if(!mpInitializer)
+    if(!mpInitializer) // -- Processe the first frame.
     {
         // Set Reference Frame
         if(mCurrentFrame.mvKeys.size()>100)
@@ -587,7 +587,7 @@ void Tracking::MonocularInitialization()
     else
     {
         // Try to initialize
-        if((int)mCurrentFrame.mvKeys.size()<=100)
+        if((int)mCurrentFrame.mvKeys.size()<=100) // -- If the second frame lack of keypoints, return.
         {
             delete mpInitializer;
             mpInitializer = static_cast<Initializer*>(NULL);
@@ -764,13 +764,13 @@ bool Tracking::TrackReferenceKeyFrame()
     ORBmatcher matcher(0.7,true);
     vector<MapPoint*> vpMapPointMatches;
 
-    int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
+    int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches); // -- line159 Compare the last reference key frame and current frame.
 
     if(nmatches<15)
         return false;
 
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
-    mCurrentFrame.SetPose(mLastFrame.mTcw);
+    mCurrentFrame.SetPose(mLastFrame.mTcw); // -- Use the last frame's pose as a initial pose to optimize.
 
     Optimizer::PoseOptimization(&mCurrentFrame);
 

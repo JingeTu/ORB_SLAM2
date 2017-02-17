@@ -111,3 +111,8 @@ add_executable(mono_euroc
 Examples/Monocular/mono_euroc.cc)
 target_link_libraries(mono_euroc ${PROJECT_NAME})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/MyExamples)
+
+add_executable(orb_match
+Examples/MyExamples/orb_match.cc)
+target_link_libraries(orb_match ${PROJECT_NAME})

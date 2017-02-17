@@ -40,6 +40,9 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     "This is free software, and you are welcome to redistribute it" << endl <<
     "under certain conditions. See LICENSE.txt." << endl << endl;
 
+    clog << "strVocFile : " << strVocFile << endl
+     << "strSettingsFile : " << strSettingsFile << endl;
+
     cout << "Input sensor was set to: ";
 
     if(mSensor==MONOCULAR)
@@ -174,15 +177,15 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
 
     // Check mode change
     {
-        unique_lock<mutex> lock(mMutexMode);
-        if(mbActivateLocalizationMode)
-        {
+        unique_lock<mutex> lock(mMutexMode); // -- lock this code block
+        if(mbActivateLocalizationMode) 
+        { // -- Localization mode or SLAM mode, whether I will add current frame's keypoints into the map.
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
-            while(!mpLocalMapper->isStopped())
+            while(!mpLocalMapper->isStopped()) // -- Just do localization, so stop the local map.
             {
-                usleep(1000);
+                usleep(1000); // -- Every 1ms check once, until it is stopped.
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -199,14 +202,16 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     // Check reset
     {
     unique_lock<mutex> lock(mMutexReset);
-    if(mbReset)
+    if(mbReset) // -- Clear the map. All will be reset, including local map, loop closer, keyframe database.
     {
         mpTracker->Reset();
         mbReset = false;
     }
     }
 
-    cv::Mat Tcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp);
+    cv::Mat Tcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp); // -- Input rgb-d data and time into the tracker and track.
+
+    // clog << "Tcw : " << Tcw << endl;
 
     unique_lock<mutex> lock2(mMutexState);
     mTrackingState = mpTracker->mState;
