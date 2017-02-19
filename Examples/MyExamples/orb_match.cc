@@ -1,5 +1,3 @@
-// orb_match.cc
-
 #include <iostream>
 #include "ORBVocabulary.h"
 #include "ORBextractor.h"
@@ -36,6 +34,20 @@ size_t *Permutation(size_t N) {
     return a;
 }
 
+cv::Mat SolveF(const cv::Mat &A) {
+    cv::Mat w, u, vt;
+    cv::SVD::compute(A, w, u, vt);
+    cv::Mat Frls = vt.row(vt.rows - 1).t();
+    cv::Mat Frl(3, 3, CV_32F);
+    cv::Mat Fc1 = Frls.rowRange(0, 3);
+    Fc1.copyTo(Frl.col(0));
+    cv::Mat Fc2 = Frls.rowRange(3, 6);
+    Fc2.copyTo(Frl.col(1));
+    cv::Mat Fc3 = Frls.rowRange(6, 9);
+    Fc3.copyTo(Frl.col(2));
+    return Frl;
+}
+
 void DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat & R2, cv::Mat &t) {
     cv::Mat u, w, vt;
     cv::SVD::compute(E, w, u, vt);
@@ -57,6 +69,18 @@ void DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat & R2, cv::Mat &t) {
         R2 = -R2;
 }
 
+cv::Mat LinearTriangulation(const cv::Mat &x1, const cv::Mat &x2, const cv::Mat &P1, const cv::Mat &P2) {
+    cv::Mat A(4,4,CV_32F);
+    A.row(0) = x1.at<float>(0)*P1.row(2)-P1.row(0);
+    A.row(1) = x1.at<float>(1)*P1.row(2)-P1.row(1);
+    A.row(2) = x2.at<float>(0)*P2.row(2)-P2.row(0);
+    A.row(3) = x2.at<float>(1)*P2.row(2)-P2.row(1);
+    cv::Mat w,u,vt;
+    cv::SVD::compute(A,w,u,vt,cv::SVD::MODIFY_A| cv::SVD::FULL_UV);
+    cv::Mat X = vt.row(3).t();
+    return X;
+}
+
 int CheckRT(const cv::Mat &K, const cv::Mat &R, const cv::Mat &t, const std::vector<cv::KeyPoint> &keypointsL, const std::vector<cv::KeyPoint> &keypointsR, const std::vector<cv::DMatch> &inlierMatches) {
     int inlierNum = 0;
 
@@ -70,14 +94,7 @@ int CheckRT(const cv::Mat &K, const cv::Mat &R, const cv::Mat &t, const std::vec
         R.copyTo(Pr.rowRange(0, 3).colRange(0, 3));
         t.copyTo(Pr.rowRange(0, 3).col(3));
         Pr = K * Pr;
-        cv::Mat A(4,4,CV_32F);
-        A.row(0) = xl.at<float>(0)*Pl.row(2)-Pl.row(0);
-        A.row(1) = xl.at<float>(1)*Pl.row(2)-Pl.row(1);
-        A.row(2) = xr.at<float>(0)*Pr.row(2)-Pr.row(0);
-        A.row(3) = xr.at<float>(1)*Pr.row(2)-Pr.row(1);
-        cv::Mat w,u,vt;
-        cv::SVD::compute(A,w,u,vt,cv::SVD::MODIFY_A| cv::SVD::FULL_UV);
-        cv::Mat Xl = vt.row(3).t();
+        cv::Mat Xl = LinearTriangulation(xl, xr, Pl, Pr);
         Xl = Xl.rowRange(0,3)/Xl.at<float>(3);
         cv::Mat Xr = R * Xl + t;
         if (Xl.at<float>(2) > 0 && Xr.at<float>(2) > 0)
@@ -88,10 +105,12 @@ int CheckRT(const cv::Mat &K, const cv::Mat &R, const cv::Mat &t, const std::vec
 }
 
 void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL, const std::vector<cv::KeyPoint> &keypointsR,
- const std::vector<cv::DMatch> &matches, std::vector<cv::DMatch> &inlierMatches) {
+ const std::vector<cv::DMatch> &matches, const float outlierRatio, std::vector<cv::DMatch> &inlierMatches) {
     std::srand(std::time(0));
-    int nIterationNum = 200; // RANSAC iteration number.
+    float fOutlierRatio = outlierRatio;
     int nMatchNum = 8; // Use 8 point to solve analytic solutions.
+    float fConfidenceRatio = 0.999;
+    int nIterationNum = (int) (std::log(1 - fConfidenceRatio) / std::log(1 - std::pow(1 - fOutlierRatio, nMatchNum))); // RANSAC iteration number.
     int nTotalMatchNum = matches.size();
     int minOutlier = std::numeric_limits<int>::max();
     cv::Mat bestMatchFrl;
@@ -115,19 +134,12 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
         }
 
         // Solve the fundamental matrix.
-        cv::Mat w, u, vt;
-        cv::SVD::compute(A, w, u, vt);
-        cv::Mat Frls = vt.row(vt.rows - 1).t();
-        cv::Mat Frl(3, 3, CV_32F);
-        cv::Mat Fc1 = Frls.rowRange(0, 3);
-        Fc1.copyTo(Frl.col(0));
-        cv::Mat Fc2 = Frls.rowRange(3, 6);
-        Fc2.copyTo(Frl.col(1));
-        cv::Mat Fc3 = Frls.rowRange(6, 9);
-        Fc3.copyTo(Frl.col(2));
+        cv::Mat Frl = SolveF(A);
 
         // Use fundamental matrix to determine which match pair is a outlier.
         int outlierNum = 0;
+        std::vector<bool> outlier;
+        outlier.resize(nTotalMatchNum);
         for (int j = 0; j < nTotalMatchNum; ++j) {
             cv::Point2f xl = keypointsL[matches[j].queryIdx].pt;
             cv::Point2f xr = keypointsR[matches[j].trainIdx].pt;
@@ -135,13 +147,34 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
             float b = Frl.at<float>(1, 0) * xl.x + Frl.at<float>(1, 1) * xl.y + Frl.at<float>(1, 2) * 1.0f;
             float c = Frl.at<float>(2, 0) * xl.x + Frl.at<float>(2, 1) * xl.y + Frl.at<float>(2, 2) * 1.0f;
             float d2 = ((a * xr.x + b * xr.y + c * 1.0f) * (a * xr.x + b * xr.y + c * 1.0f)) / (a * a + b * b);
-            if (d2 > 25.0f) outlierNum++;
+            if (d2 > 25.0f) {
+                outlierNum++;
+                outlier[j] = true;
+            }
+             else outlier[j] = false;
         }
+        // if (outlierNum < fOutlierRatio * nTotalMatchNum) {
+        //     if (outlierNum < minOutlier)
+        //         minOutlier = outlierNum;
+        //     int count = 0;
+        //     cv::Mat A(nTotalMatchNum - outlierNum, 9, CV_32F);
+        //     for (int j = 0; j < nTotalMatchNum; ++j) {
+        //         if (!outlier[j]) {
+        //             cv::Point2f xl = keypointsL[matches[j].queryIdx].pt;
+        //             cv::Point2f xr = keypointsR[matches[j].trainIdx].pt;
+        //             cv::Mat a = (cv::Mat_<float>(1, 9) << xl.x * xr.x, xl.x * xr.y, xl.x * 1.0f, xl.y * xr.x, xl.y * xr.y, xl.y * 1.0f, 1.0f * xr.x, 1.0f * xr.y, 1.0f * 1.0f);
+        //             a.copyTo(A.row(count++));
+        //         }
+        //     }
+        //     bestMatchFrl = SolveF(A);
+        // }
         if (outlierNum < minOutlier) {
             minOutlier = outlierNum;
             bestMatchFrl = Frl;
         }
     }
+
+    std::cout << "bestMatchFrl = " << bestMatchFrl << std::endl;
 
     // Use the best fundamental matrix to exclude outliers.
     for (int j = 0; j < nTotalMatchNum; ++j) {
@@ -150,7 +183,7 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
         float a = bestMatchFrl.at<float>(0, 0) * xl.x + bestMatchFrl.at<float>(0, 1) * xl.y + bestMatchFrl.at<float>(0, 2) * 1.0f;
         float b = bestMatchFrl.at<float>(1, 0) * xl.x + bestMatchFrl.at<float>(1, 1) * xl.y + bestMatchFrl.at<float>(1, 2) * 1.0f;
         float c = bestMatchFrl.at<float>(2, 0) * xl.x + bestMatchFrl.at<float>(2, 1) * xl.y + bestMatchFrl.at<float>(2, 2) * 1.0f;
-        float d2 = ((a * xr.x + b * xr.y + c * 1.0f) * (a * xr.x + b * xr.y + c * 1.0f)) / (a * a + b * b);
+        float d2 = std::pow(a * xr.x + b * xr.y + c * 1.0f, 2) / (a * a + b * b);
         if (d2 < 25.0f) {
             inlierMatches.push_back(matches[j]);
         }
@@ -216,14 +249,7 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
         R.copyTo(Pr.rowRange(0, 3).colRange(0, 3));
         t.copyTo(Pr.rowRange(0, 3).col(3));
         Pr = K * Pr;
-        cv::Mat A(4,4,CV_32F);
-        A.row(0) = xl.at<float>(0)*Pl.row(2)-Pl.row(0);
-        A.row(1) = xl.at<float>(1)*Pl.row(2)-Pl.row(1);
-        A.row(2) = xr.at<float>(0)*Pr.row(2)-Pr.row(0);
-        A.row(3) = xr.at<float>(1)*Pr.row(2)-Pr.row(1);
-        cv::Mat w,u,vt;
-        cv::SVD::compute(A,w,u,vt,cv::SVD::MODIFY_A| cv::SVD::FULL_UV);
-        cv::Mat Xl = vt.row(3).t();
+        cv::Mat Xl = LinearTriangulation(xl, xr, Pl, Pr);
         Xl = Xl.rowRange(0,3)/Xl.at<float>(3);
         cv::Mat Xr = R * Xl + t;
         if (Xl.at<float>(2) > 0 && Xr.at<float>(2) > 0)
@@ -246,8 +272,8 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
 int main(int argc, char** argv) {
 
     // Read the raw data
-	cv::Mat rawL = cv::imread(argv[3]); // /home/jg/Downloads/rgbd_dataset_freiburg1_desk2/rgb/1305031526.671473.png
-	cv::Mat rawR = cv::imread(argv[4]); // /home/jg/Downloads/rgbd_dataset_freiburg1_desk2/rgb/1305031526.871446.png
+	cv::Mat rawL = cv::imread(argv[3]);
+	cv::Mat rawR = cv::imread(argv[4]);
 
 	ORB_SLAM2::ORBVocabulary *pORBVocabulary = new ORB_SLAM2::ORBVocabulary();
     std::cout << "Read ORBVocabulary from `" << argv[1] << "`." << std::endl;
@@ -316,7 +342,7 @@ int main(int argc, char** argv) {
     matcher.match(descriptorsL, descriptorsR, matches); // `queryIdx` for descriptorsL, `trainIdx` for descriptorsR.
 
     std::vector<cv::DMatch> inlierMatches;
-    MyRANSACMatch(K, keypointsL, keypointsR, matches, inlierMatches);
+    MyRANSACMatch(K, keypointsL, keypointsR, matches, 0.5, inlierMatches);
 
     cv::Mat imgMatches;
     cv::drawMatches( udL, keypointsL, udR, keypointsR, inlierMatches, imgMatches );
