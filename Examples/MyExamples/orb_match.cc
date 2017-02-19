@@ -62,21 +62,26 @@ int CheckRT(const cv::Mat &K, const cv::Mat &R, const cv::Mat &t, const std::vec
 
     for (int i = 0, iend = inlierMatches.size(); i < iend; ++i) {
         cv::Mat xl = (cv::Mat_<float>(3, 1) << keypointsL[inlierMatches[i].queryIdx].pt.x, keypointsL[inlierMatches[i].queryIdx].pt.y, 1.0f);
-        xl = K.inv() * xl;
-        cv::Mat xp = R * xl + t;
-        xp = K * xp;
-        xp = xp / xp.at<float>(2, 0);
-        // if (i == 0) {
-        //     std::cout << "*********************************" << std::endl;
-        //     std::cout << "xp = " << xp << std::endl;
-        //     std::cout << "xr = " << keypointsR[inlierMatches[i].trainIdx].pt.x << ", " << keypointsR[inlierMatches[i].trainIdx].pt.y << std::endl;
-        //     std::cout << "*********************************" << std::endl;
-        // }
-        float d2 = (xp.at<float>(0, 0) - keypointsR[inlierMatches[i].trainIdx].pt.x) * (xp.at<float>(0, 0) - keypointsR[inlierMatches[i].trainIdx].pt.x)
-        + (xp.at<float>(1, 0) - keypointsR[inlierMatches[i].trainIdx].pt.y) * (xp.at<float>(1, 0) - keypointsR[inlierMatches[i].trainIdx].pt.y);
-        if (d2 < 49.0f) {
+        cv::Mat xr = (cv::Mat_<float>(3, 1) << keypointsR[inlierMatches[i].trainIdx].pt.x, keypointsR[inlierMatches[i].trainIdx].pt.y, 1.0f);
+        cv::Mat Pl(3, 4, CV_32F, cv::Scalar(0));
+        Pl.at<float>(0, 0) = 1.0f;Pl.at<float>(1, 1) = 1.0f;Pl.at<float>(2, 2) = 1.0f;
+        Pl = K * Pl;
+        cv::Mat Pr(3, 4, CV_32F);
+        R.copyTo(Pr.rowRange(0, 3).colRange(0, 3));
+        t.copyTo(Pr.rowRange(0, 3).col(3));
+        Pr = K * Pr;
+        cv::Mat A(4,4,CV_32F);
+        A.row(0) = xl.at<float>(0)*Pl.row(2)-Pl.row(0);
+        A.row(1) = xl.at<float>(1)*Pl.row(2)-Pl.row(1);
+        A.row(2) = xr.at<float>(0)*Pr.row(2)-Pr.row(0);
+        A.row(3) = xr.at<float>(1)*Pr.row(2)-Pr.row(1);
+        cv::Mat w,u,vt;
+        cv::SVD::compute(A,w,u,vt,cv::SVD::MODIFY_A| cv::SVD::FULL_UV);
+        cv::Mat Xl = vt.row(3).t();
+        Xl = Xl.rowRange(0,3)/Xl.at<float>(3);
+        cv::Mat Xr = R * Xl + t;
+        if (Xl.at<float>(2) > 0 && Xr.at<float>(2) > 0)
             inlierNum ++;
-        }
     }
 
     return inlierNum;
@@ -195,25 +200,41 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
         t = t2;
     }
 
-    inlierMatches.clear();
+    // inlierMatches.clear();
+    
+    std::vector<cv::DMatch> inlierMatchesTemp;
 
-    int outliersNum = 0;
+    int outlierNum = 0;
 
-    for (int i = 0, iend = matches.size(); i < iend; ++i) {
-        cv::Mat xl = K.inv() * (cv::Mat_<float>(3, 1) << keypointsL[matches[i].queryIdx].pt.x, keypointsL[matches[i].queryIdx].pt.y, 1.0f);
-        cv::Mat xp = R * xl + t;
-        xp = xp / xp.at<float>(2, 0);
-        float d2 = (xp.at<float>(0, 0) - keypointsR[matches[i].trainIdx].pt.x) * (xp.at<float>(0, 0) - keypointsR[matches[i].trainIdx].pt.x)
-        + (xp.at<float>(1, 0) - keypointsR[matches[i].trainIdx].pt.y) * (xp.at<float>(1, 0) - keypointsR[matches[i].trainIdx].pt.y);
-        if (d2 > 25.0f) {
-            outliersNum ++;
-        }
-        else {
-            inlierMatches.push_back(matches[i]);
-        }
+    for (int i = 0, iend = inlierMatches.size(); i < iend; ++i) {
+        cv::Mat xl = (cv::Mat_<float>(3, 1) << keypointsL[inlierMatches[i].queryIdx].pt.x, keypointsL[inlierMatches[i].queryIdx].pt.y, 1.0f);
+        cv::Mat xr = (cv::Mat_<float>(3, 1) << keypointsR[inlierMatches[i].trainIdx].pt.x, keypointsR[inlierMatches[i].trainIdx].pt.y, 1.0f);
+        cv::Mat Pl(3, 4, CV_32F, cv::Scalar(0));
+        Pl.at<float>(0, 0) = 1.0f;Pl.at<float>(1, 1) = 1.0f;Pl.at<float>(2, 2) = 1.0f;
+        Pl = K * Pl;
+        cv::Mat Pr(3, 4, CV_32F);
+        R.copyTo(Pr.rowRange(0, 3).colRange(0, 3));
+        t.copyTo(Pr.rowRange(0, 3).col(3));
+        Pr = K * Pr;
+        cv::Mat A(4,4,CV_32F);
+        A.row(0) = xl.at<float>(0)*Pl.row(2)-Pl.row(0);
+        A.row(1) = xl.at<float>(1)*Pl.row(2)-Pl.row(1);
+        A.row(2) = xr.at<float>(0)*Pr.row(2)-Pr.row(0);
+        A.row(3) = xr.at<float>(1)*Pr.row(2)-Pr.row(1);
+        cv::Mat w,u,vt;
+        cv::SVD::compute(A,w,u,vt,cv::SVD::MODIFY_A| cv::SVD::FULL_UV);
+        cv::Mat Xl = vt.row(3).t();
+        Xl = Xl.rowRange(0,3)/Xl.at<float>(3);
+        cv::Mat Xr = R * Xl + t;
+        if (Xl.at<float>(2) > 0 && Xr.at<float>(2) > 0)
+            inlierMatchesTemp.push_back(inlierMatches[i]);
+        else
+            outlierNum++;
     }
 
-    std::cout << "outliersNum = " << outliersNum << std::endl;
+    inlierMatches = inlierMatchesTemp;
+
+    std::cout << "outlierNum = " << outlierNum << std::endl;
 
     std::cout << "R = " << R << std::endl;
 
