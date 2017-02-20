@@ -106,7 +106,9 @@ int CheckRT(const cv::Mat &K, const cv::Mat &R, const cv::Mat &t, const std::vec
 
 void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL, const std::vector<cv::KeyPoint> &keypointsR,
  const std::vector<cv::DMatch> &matches, const float outlierRatio, std::vector<cv::DMatch> &inlierMatches) {
+
     std::srand(std::time(0));
+
     float fOutlierRatio = outlierRatio;
     int nMatchNum = 8; // Use 8 point to solve analytic solutions.
     float fConfidenceRatio = 0.999;
@@ -114,7 +116,7 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
     int nTotalMatchNum = matches.size();
     int minOutlier = std::numeric_limits<int>::max();
     cv::Mat bestMatchFrl;
-    for (int i = 0; i < nIterationNum; ++i) {
+    for (int iter = 0; iter < nIterationNum; ++iter) {
 
         // Run a permutation to choose 8 matches to solve fundamental matrix.
         std::vector<size_t> vChoosenMatches;
@@ -151,30 +153,30 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
                 outlierNum++;
                 outlier[j] = true;
             }
-             else outlier[j] = false;
+            else
+                outlier[j] = false;
         }
-        // if (outlierNum < fOutlierRatio * nTotalMatchNum) {
-        //     if (outlierNum < minOutlier)
-        //         minOutlier = outlierNum;
-        //     int count = 0;
-        //     cv::Mat A(nTotalMatchNum - outlierNum, 9, CV_32F);
-        //     for (int j = 0; j < nTotalMatchNum; ++j) {
-        //         if (!outlier[j]) {
-        //             cv::Point2f xl = keypointsL[matches[j].queryIdx].pt;
-        //             cv::Point2f xr = keypointsR[matches[j].trainIdx].pt;
-        //             cv::Mat a = (cv::Mat_<float>(1, 9) << xl.x * xr.x, xl.x * xr.y, xl.x * 1.0f, xl.y * xr.x, xl.y * xr.y, xl.y * 1.0f, 1.0f * xr.x, 1.0f * xr.y, 1.0f * 1.0f);
-        //             a.copyTo(A.row(count++));
-        //         }
-        //     }
-        //     bestMatchFrl = SolveF(A);
-        // }
-        if (outlierNum < minOutlier) {
-            minOutlier = outlierNum;
-            bestMatchFrl = Frl;
+        if (outlierNum < fOutlierRatio * nTotalMatchNum) {
+            if (outlierNum < minOutlier)
+                minOutlier = outlierNum;
+            int point_count = nTotalMatchNum - outlierNum;
+            int count = 0;
+            std::vector<cv::Point2f> pointsL(point_count);
+            std::vector<cv::Point2f> pointsR(point_count);
+            for (int j = 0; j < nTotalMatchNum; ++j) {
+                if (!outlier[j]) {
+                    pointsL[count] = keypointsL[matches[j].queryIdx].pt;
+                    pointsR[count] = keypointsR[matches[j].trainIdx].pt;
+                    ++count;
+                }
+            }
+            bestMatchFrl = cv::findFundamentalMat(pointsL, pointsR, cv::FM_RANSAC, 3, 0.99);
         }
     }
 
     std::cout << "bestMatchFrl = " << bestMatchFrl << std::endl;
+    bestMatchFrl.convertTo(bestMatchFrl, CV_32F);
+
 
     // Use the best fundamental matrix to exclude outliers.
     for (int j = 0; j < nTotalMatchNum; ++j) {
@@ -188,6 +190,7 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
             inlierMatches.push_back(matches[j]);
         }
     }
+
 
     std::cout << "inlierMatches.size() = " << inlierMatches.size() << std::endl;
 
@@ -206,6 +209,7 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
     std::cout << "|R1| = " << cv::determinant(R1) << std::endl;
     std::cout << "|R2| = " << cv::determinant(R2) << std::endl;
 
+    // Check if the two z is both positive.
     int good1 = CheckRT(K, R1, t1, keypointsL, keypointsR, inlierMatches);
     int good2 = CheckRT(K, R1, t2, keypointsL, keypointsR, inlierMatches);
     int good3 = CheckRT(K, R2, t1, keypointsL, keypointsR, inlierMatches);
@@ -232,8 +236,6 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
         R = R2;
         t = t2;
     }
-
-    // inlierMatches.clear();
     
     std::vector<cv::DMatch> inlierMatchesTemp;
 
