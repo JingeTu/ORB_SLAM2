@@ -1,10 +1,14 @@
 #include <iostream>
-#include "ORBVocabulary.h"
-#include "ORBextractor.h"
+#include "ORBVocabulary_M.h"
+#include "ORBextractor_M.h"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
+
+#include <boost/thread/thread.hpp>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/io/pcd_io.h>
 
 #include <cstdlib>
 #include <ctime>
@@ -104,10 +108,12 @@ int CheckRT(const cv::Mat &K, const cv::Mat &R, const cv::Mat &t, const std::vec
     return inlierNum;
 }
 
-void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL, const std::vector<cv::KeyPoint> &keypointsR,
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL, const std::vector<cv::KeyPoint> &keypointsR,
  const std::vector<cv::DMatch> &matches, const float outlierRatio, std::vector<cv::DMatch> &inlierMatches) {
 
     std::srand(std::time(0));
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
 
     float fOutlierRatio = outlierRatio;
     int nMatchNum = 8; // Use 8 point to solve analytic solutions.
@@ -174,7 +180,6 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
         }
     }
 
-    std::cout << "bestMatchFrl = " << bestMatchFrl << std::endl;
     bestMatchFrl.convertTo(bestMatchFrl, CV_32F);
 
 
@@ -191,9 +196,6 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
         }
     }
 
-
-    std::cout << "inlierMatches.size() = " << inlierMatches.size() << std::endl;
-
     // Project fundamental matrix
     cv::Mat w, u, vt;
     cv::SVD::compute(bestMatchFrl, w, u, vt);
@@ -206,9 +208,6 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
     DecomposeE(E, R1, R2, t1);
     t2 = -t1;
 
-    std::cout << "|R1| = " << cv::determinant(R1) << std::endl;
-    std::cout << "|R2| = " << cv::determinant(R2) << std::endl;
-
     // Check if the two z is both positive.
     int good1 = CheckRT(K, R1, t1, keypointsL, keypointsR, inlierMatches);
     int good2 = CheckRT(K, R1, t2, keypointsL, keypointsR, inlierMatches);
@@ -216,8 +215,6 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
     int good4 = CheckRT(K, R2, t2, keypointsL, keypointsR, inlierMatches);
 
     int maxGood = std::max(good1, std::max(good2, std::max(good3, good4)));
-
-    std::cout << "maxGood = " << maxGood << std::endl;
 
     cv::Mat R, t;
     if (maxGood == good1) {
@@ -241,34 +238,34 @@ void MyRANSACMatch(const cv::Mat &K, const std::vector<cv::KeyPoint> &keypointsL
 
     int outlierNum = 0;
 
+    cv::Mat Pl(3, 4, CV_32F, cv::Scalar(0));
+    Pl.at<float>(0, 0) = 1.0f;Pl.at<float>(1, 1) = 1.0f;Pl.at<float>(2, 2) = 1.0f;
+    Pl = K * Pl;
+    cv::Mat Pr(3, 4, CV_32F);
+    R.copyTo(Pr.rowRange(0, 3).colRange(0, 3));
+    t.copyTo(Pr.rowRange(0, 3).col(3));
+    Pr = K * Pr;
     for (int i = 0, iend = inlierMatches.size(); i < iend; ++i) {
         cv::Mat xl = (cv::Mat_<float>(3, 1) << keypointsL[inlierMatches[i].queryIdx].pt.x, keypointsL[inlierMatches[i].queryIdx].pt.y, 1.0f);
         cv::Mat xr = (cv::Mat_<float>(3, 1) << keypointsR[inlierMatches[i].trainIdx].pt.x, keypointsR[inlierMatches[i].trainIdx].pt.y, 1.0f);
-        cv::Mat Pl(3, 4, CV_32F, cv::Scalar(0));
-        Pl.at<float>(0, 0) = 1.0f;Pl.at<float>(1, 1) = 1.0f;Pl.at<float>(2, 2) = 1.0f;
-        Pl = K * Pl;
-        cv::Mat Pr(3, 4, CV_32F);
-        R.copyTo(Pr.rowRange(0, 3).colRange(0, 3));
-        t.copyTo(Pr.rowRange(0, 3).col(3));
-        Pr = K * Pr;
         cv::Mat Xl = LinearTriangulation(xl, xr, Pl, Pr);
         Xl = Xl.rowRange(0,3)/Xl.at<float>(3);
         cv::Mat Xr = R * Xl + t;
-        if (Xl.at<float>(2) > 0 && Xr.at<float>(2) > 0)
+        if (Xl.at<float>(2) > 0 && Xr.at<float>(2) > 0) {
             inlierMatchesTemp.push_back(inlierMatches[i]);
+            pcl::PointXYZRGB point;
+            point.x = Xl.at<float>(0);
+            point.y = Xl.at<float>(1);
+            point.z = Xl.at<float>(2);
+            point_cloud_ptr->points.push_back(point);
+        }
         else
             outlierNum++;
     }
 
     inlierMatches = inlierMatchesTemp;
 
-    std::cout << "outlierNum = " << outlierNum << std::endl;
-
-    std::cout << "R = " << R << std::endl;
-
-    std::cout << "t = " << t << std::endl;
-
-    std::cout << "inlierMatches.size() == " << inlierMatches.size() << std::endl;
+    return point_cloud_ptr;
 }
 
 int main(int argc, char** argv) {
@@ -277,15 +274,15 @@ int main(int argc, char** argv) {
 	cv::Mat rawL = cv::imread(argv[3]);
 	cv::Mat rawR = cv::imread(argv[4]);
 
-	ORB_SLAM2::ORBVocabulary *pORBVocabulary = new ORB_SLAM2::ORBVocabulary();
-    std::cout << "Read ORBVocabulary from `" << argv[1] << "`." << std::endl;
-	bool bVocLoad = pORBVocabulary->loadFromTextFile(argv[1]); // Vocabulary/ORBvoc.txt
-	if(!bVocLoad) {
-        std::cerr << "Wrong path to vocabulary. " << std::endl;
-        std::cerr << "Falied to open at: " << argv << std::endl;
-        exit(-1);
-    }
-    std::cout << "ORBVocabulary loaded." << std::endl;
+	// ORB_SLAM2_M::ORBVocabulary *pORBVocabulary = new ORB_SLAM2_M::ORBVocabulary();
+ //    std::cout << "Read ORBVocabulary from `" << argv[1] << "`." << std::endl;
+	// bool bVocLoad = pORBVocabulary->loadFromTextFile(argv[1]); // Vocabulary/ORBvoc.txt
+	// if(!bVocLoad) {
+ //        std::cerr << "Wrong path to vocabulary. " << std::endl;
+ //        std::cerr << "Falied to open at: " << argv << std::endl;
+ //        exit(-1);
+ //    }
+ //    std::cout << "ORBVocabulary loaded." << std::endl;
 
     cv::FileStorage fSettings(argv[2], cv::FileStorage::READ); // Examples/Monocular/TUM1.yaml
 
@@ -326,7 +323,7 @@ int main(int argc, char** argv) {
     cv::undistort(rawR, udR, K, DistCoef, K);
 
     // Extract features.
-    ORB_SLAM2::ORBextractor* pORBExtractor = new ORB_SLAM2::ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    ORB_SLAM2_M::ORBextractor* pORBExtractor = new ORB_SLAM2_M::ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
     std::vector<cv::KeyPoint> keypointsL;
     std::vector<cv::KeyPoint> keypointsR;
@@ -344,11 +341,21 @@ int main(int argc, char** argv) {
     matcher.match(descriptorsL, descriptorsR, matches); // `queryIdx` for descriptorsL, `trainIdx` for descriptorsR.
 
     std::vector<cv::DMatch> inlierMatches;
-    MyRANSACMatch(K, keypointsL, keypointsR, matches, 0.5, inlierMatches);
+    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Reconstruction"));
+    viewer->setBackgroundColor(255, 255, 255);
+    viewer->addCoordinateSystem(1.0);
+
+    viewer->addPointCloud<pcl::PointXYZRGB>(MyRANSACMatch(K, keypointsL, keypointsR, matches, 0.5, inlierMatches), "Reconstruction Cloud");
 
     cv::Mat imgMatches;
     cv::drawMatches( udL, keypointsL, udR, keypointsR, inlierMatches, imgMatches );
     cv::imshow( "matches", imgMatches );
+
+    while (!viewer->wasStopped()) {
+        viewer->spinOnce(100);
+        boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+    }
+
     cv::waitKey(0);
 
 	return 0;
