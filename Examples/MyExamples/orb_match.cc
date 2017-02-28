@@ -1,6 +1,6 @@
 #include <iostream>
-#include "ORBVocabulary_M.h"
-#include "ORBextractor_M.h"
+#include "ORBVocabulary.h"
+#include "ORBextractor.h"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -318,23 +318,25 @@ int main(int argc, char** argv) {
 
     // Undistort Images.
     cv::Mat udL;
-    cv::undistort(rawL, udL, K, DistCoef, K);
+    // cv::undistort(rawL, udL, K, DistCoef, K);
     cv::Mat udR;
-    cv::undistort(rawR, udR, K, DistCoef, K);
+    // cv::undistort(rawR, udR, K, DistCoef, K);
 
     // Extract features.
-    ORB_SLAM2_M::ORBextractor* pORBExtractor = new ORB_SLAM2_M::ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    ORB_SLAM2::ORBextractor* pORBExtractor = new ORB_SLAM2::ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
     std::vector<cv::KeyPoint> keypointsL;
     std::vector<cv::KeyPoint> keypointsR;
     cv::Mat descriptorsL;
     cv::Mat descriptorsR;
 
-    cv::Mat grayL = ConvertToGray(udL, nRGB);
-    cv::Mat grayR = ConvertToGray(udR, nRGB);
+    cv::Mat grayL = ConvertToGray(rawL, nRGB);
+    cv::Mat grayR = ConvertToGray(rawR, nRGB);
 
     (*pORBExtractor)(grayL, cv::Mat(), keypointsL, descriptorsL);
     (*pORBExtractor)(grayR, cv::Mat(), keypointsR, descriptorsR);
+
+    std::cout << "DEBUG: I AM HERE *************************\n";
 
     std::vector<cv::DMatch> matches;
     cv::BFMatcher matcher(cv::NORM_L2, true);
