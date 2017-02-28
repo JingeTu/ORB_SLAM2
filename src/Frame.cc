@@ -228,7 +228,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 }
 
 void Frame::AssignFeaturesToGrid()
-{
+{ // -- Only reserve half of the total number of keypoints.
     int nReserve = 0.5f*N/(FRAME_GRID_COLS*FRAME_GRID_ROWS);
     for(unsigned int i=0; i<FRAME_GRID_COLS;i++)
         for (unsigned int j=0; j<FRAME_GRID_ROWS;j++)
@@ -328,7 +328,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
 {
     vector<size_t> vIndices;
     vIndices.reserve(N);
-
+    // -- Use Grid to search.
     const int nMinCellX = max(0,(int)floor((x-mnMinX-r)*mfGridElementWidthInv));
     if(nMinCellX>=FRAME_GRID_COLS)
         return vIndices;
@@ -370,7 +370,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
                 const float distx = kpUn.pt.x-x;
                 const float disty = kpUn.pt.y-y;
 
-                if(fabs(distx)<r && fabs(disty)<r)
+                if(fabs(distx)<r && fabs(disty)<r) // -- r is the windowsize if within the windowsize then is pre matched.
                     vIndices.push_back(vCell[j]);
             }
         }
@@ -430,6 +430,11 @@ void Frame::UndistortKeyPoints()
         kp.pt.x=mat.at<float>(i,0);
         kp.pt.y=mat.at<float>(i,1);
         mvKeysUn[i]=kp;
+
+        // -- May be this is more efficient.
+        // mvKeysUn[i].pt = mvKeys[i];
+        // mvKeysUn[i].pt.x = mat.at<float>(i, 0);
+        // mvKeysUn[i].pt.y = mat.at<float>(i, 1);
     }
 }
 
@@ -658,7 +663,7 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
         if(d>0)
         {
             mvDepth[i] = d;
-            mvuRight[i] = kpU.pt.x-mbf/d; // -- U_L- U_R = baseline * fx / d (mbf = baseline * fx)
+            mvuRight[i] = kpU.pt.x-mbf/d; // -- U_L- U_R = baseline * fx / d (mbf = baseline * fx), the unit of baseline is pixel (or does not have a unit).
         }
     }
 }

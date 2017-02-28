@@ -597,7 +597,7 @@ void Tracking::MonocularInitialization()
 
         // Find correspondences
         ORBmatcher matcher(0.9,true);
-        int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
+        int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100); // -- windowSize 100 pixel
 
         // Check if there are enough correspondences
         if(nmatches<100)
@@ -788,7 +788,7 @@ bool Tracking::TrackReferenceKeyFrame()
                 mCurrentFrame.mvbOutlier[i]=false;
                 pMP->mbTrackInView = false;
                 pMP->mnLastFrameSeen = mCurrentFrame.mnId; // -- This is a outlier MapPoint for CurrentFrame, why set it's `mnLastFrameSeen` as CurrentFrame?
-                // nmatches--;
+                nmatches--;
             }
             else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
                 nmatchesMap++;

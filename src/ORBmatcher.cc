@@ -419,7 +419,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
     {
         cv::KeyPoint kp1 = F1.mvKeysUn[i1];
         int level1 = kp1.octave;
-        if(level1>0)
+        if(level1>0) // -- Only use the source image keypoints.
             continue;
 
         vector<size_t> vIndices2 = F2.GetFeaturesInArea(vbPrevMatched[i1].x,vbPrevMatched[i1].y, windowSize,level1,level1);
@@ -427,7 +427,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
         if(vIndices2.empty())
             continue;
 
-        cv::Mat d1 = F1.mDescriptors.row(i1);
+        cv::Mat d1 = F1.mDescriptors.row(i1); // -- kp1's descriptor
 
         int bestDist = INT_MAX;
         int bestDist2 = INT_MAX;
@@ -458,11 +458,11 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
         if(bestDist<=TH_LOW)
         {
-            if(bestDist<(float)bestDist2*mfNNratio)
+            if(bestDist<(float)bestDist2*mfNNratio) // -- Check if the matching is silient. Outstanding from other distance.
             {
-                if(vnMatches21[bestIdx2]>=0)
+                if(vnMatches21[bestIdx2]>=0) // -- The matching point in Frame2 is previously matched.
                 {
-                    vnMatches12[vnMatches21[bestIdx2]]=-1;
+                    vnMatches12[vnMatches21[bestIdx2]]=-1; // -- Clear the previous matching.
                     nmatches--;
                 }
                 vnMatches12[i1]=bestIdx2;
@@ -470,7 +470,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
                 vMatchedDistance[bestIdx2]=bestDist;
                 nmatches++;
 
-                if(mbCheckOrientation)
+                if(mbCheckOrientation) // -- The match is just pre match. We only need the matches whoes angle distance is in the most three angle bins.
                 {
                     float rot = F1.mvKeysUn[i1].angle-F2.mvKeysUn[bestIdx2].angle;
                     if(rot<0.0)
@@ -486,7 +486,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
     }
 
-    if(mbCheckOrientation)
+    if(mbCheckOrientation) // -- Use angle to filter the matches.
     {
         int ind1=-1;
         int ind2=-1;

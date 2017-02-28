@@ -158,7 +158,7 @@ void Initializer::FindHomography(vector<bool> &vbMatchesInliers, float &score, c
             vPn2i[j] = vPn2[mvMatches12[idx].second];
         }
 
-        cv::Mat Hn = ComputeH21(vPn1i,vPn2i);
+        cv::Mat Hn = ComputeH21(vPn1i,vPn2i); // -- x_2 = H_{21}x_1
         H21i = T2inv*Hn*T1;
         H12i = H21i.inv();
 
@@ -375,7 +375,7 @@ float Initializer::CheckHomography(const cv::Mat &H21, const cv::Mat &H12, vecto
 
         const float chiSquare2 = squareDist2*invSigmaSquare;
 
-        if(chiSquare2>th)
+        if(chiSquare2>th) // -- [2] IV. AUTOMATIC MAP INITIALIZATION
             bIn = false;
         else
             score += th - chiSquare2;
@@ -596,7 +596,7 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
     float d2 = w.at<float>(1);
     float d3 = w.at<float>(2);
 
-    if(d1/d2<1.00001 || d2/d3<1.00001)
+    if(d1/d2<1.00001 || d2/d3<1.00001) // -- d1 == d2 == d3, is the impossible solution.
     {
         return false;
     }
