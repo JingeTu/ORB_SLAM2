@@ -64,6 +64,8 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
 
     const int N = mvMatches12.size();
 
+    std::cout << "mvMatches12.size() : " << mvMatches12.size() << std::endl;
+
     // Indices for minimum set selection
     vector<size_t> vAllIndices;
     vAllIndices.reserve(N);
@@ -111,7 +113,11 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
     // Compute ratio of scores
     float RH = SH/(SH+SF);
 
-    std::cout << "RH : " << RH << std::endl;
+    cout << "*******************************************" << endl;
+    cout << "SH: " << SH << endl;
+    cout << "SF: " << SF << endl;
+    cout << "RH: " << RH << endl;
+    cout << "*******************************************" << endl;
 
     // Try to reconstruct from homography or fundamental depending on the ratio (0.40-0.45)
     if(RH>0.40)

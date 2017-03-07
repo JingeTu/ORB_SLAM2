@@ -577,6 +577,8 @@ void Tracking::MonocularInitialization()
             if(mpInitializer)
                 delete mpInitializer;
 
+            std::cout << "Initializer ReferenceFrame timestamp: " << std::fixed << mCurrentFrame.mTimeStamp << std::endl;
+
             mpInitializer =  new Initializer(mCurrentFrame,1.0,200);
 
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
@@ -599,6 +601,8 @@ void Tracking::MonocularInitialization()
         ORBmatcher matcher(0.9,true);
         int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100); // -- windowSize 100 pixel
 
+        std::cout << "Pre Matched: " << nmatches << std::endl;
+
         // Check if there are enough correspondences
         if(nmatches<100)
         {
@@ -610,6 +614,8 @@ void Tracking::MonocularInitialization()
         cv::Mat Rcw; // Current Camera Rotation
         cv::Mat tcw; // Current Camera Translation
         vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
+
+        std::cout << "Initializer CurrentFrame timestamp: " << std::fixed<< mCurrentFrame.mTimeStamp << std::endl;
 
         if(mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
         {

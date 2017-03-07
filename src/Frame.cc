@@ -101,6 +101,9 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
         mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/(mnMaxX-mnMinX);
         mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/(mnMaxY-mnMinY);
 
+        std::cout << "mnMaxX : " << mnMaxX << "\t mnMinX : " << mnMinX << std::endl;
+        std::cout << "mnMaxY : " << mnMaxY << "\t mnMinY : " << mnMinY << std::endl;
+
         fx = K.at<float>(0,0);
         fy = K.at<float>(1,1);
         cx = K.at<float>(0,2);
@@ -154,6 +157,9 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 
         mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
         mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
+
+        std::cout << "mnMaxX : " << mnMaxX << "\t mnMinX : " << mnMinX << std::endl;
+        std::cout << "mnMaxY : " << mnMaxY << "\t mnMinY : " << mnMinY << std::endl;
 
         fx = K.at<float>(0,0);
         fy = K.at<float>(1,1);
@@ -212,6 +218,9 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
         mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
         mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
 
+        std::cout << "mnMaxX : " << mnMaxX << "\t mnMinX : " << mnMinX << std::endl;
+        std::cout << "mnMaxY : " << mnMaxY << "\t mnMinY : " << mnMinY << std::endl;
+        
         fx = K.at<float>(0,0);
         fy = K.at<float>(1,1);
         cx = K.at<float>(0,2);

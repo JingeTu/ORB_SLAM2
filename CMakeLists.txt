@@ -146,6 +146,18 @@ add_executable(orb_match
 Examples/MyExamples/orb_match.cc)
 target_link_libraries(orb_match ${PROJECT_NAME})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/MyExamples)
+
+add_executable(orb_camera_monocular
+Examples/MyExamples/orb_camera_monocular.cc)
+target_link_libraries(orb_camera_monocular ${PROJECT_NAME})
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/MyExamples)
+
+add_executable(orb_calibre
+Examples/MyExamples/orb_calibre.cc)
+target_link_libraries(orb_calibre ${PROJECT_NAME})
+
 # add_executable(orb_initializer
 # Examples/MyExamples/orb_initializer.cc)
 # target_link_libraries(orb_initializer ${PROJECT_NAME}_M)
