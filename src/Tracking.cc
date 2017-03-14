@@ -938,7 +938,7 @@ bool Tracking::TrackLocalMap()
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
 
-    UpdateLocalMap();
+    UpdateLocalMap(); // -- Find all covisible keyframe's map points(mvpLocalMapPoints).
 
     SearchLocalPoints();
 
@@ -1204,14 +1204,15 @@ void Tracking::UpdateLocalMap()
     mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
     // Update
-    UpdateLocalKeyFrames();
-    UpdateLocalPoints();
+    UpdateLocalKeyFrames(); // -- Find candidate loop closing keyframes(mvpLocalKeyFrames).
+    UpdateLocalPoints(); // -- From mvpLocalKeyFrames extract all the map points.
 }
 
 void Tracking::UpdateLocalPoints()
 {
     mvpLocalMapPoints.clear();
 
+    // -- Iterate loop closing keyframes.
     for(vector<KeyFrame*>::const_iterator itKF=mvpLocalKeyFrames.begin(), itEndKF=mvpLocalKeyFrames.end(); itKF!=itEndKF; itKF++)
     {
         KeyFrame* pKF = *itKF;
@@ -1237,7 +1238,7 @@ void Tracking::UpdateLocalPoints()
 void Tracking::UpdateLocalKeyFrames()
 {
     // Each map point vote for the keyframes in which it has been observed
-    map<KeyFrame*,int> keyframeCounter;
+    map<KeyFrame*,int> keyframeCounter; // -- Covisible with current frame, the int is the covisible map points
     for(int i=0; i<mCurrentFrame.N; i++)
     {
         if(mCurrentFrame.mvpMapPoints[i])
@@ -1245,7 +1246,7 @@ void Tracking::UpdateLocalKeyFrames()
             MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
             if(!pMP->isBad())
             {
-                const map<KeyFrame*,size_t> observations = pMP->GetObservations();
+                const map<KeyFrame*,size_t> observations = pMP->GetObservations(); // -- Keyframes observing the point and associated `index` in keyframe
                 for(map<KeyFrame*,size_t>::const_iterator it=observations.begin(), itend=observations.end(); it!=itend; it++)
                     keyframeCounter[it->first]++;
             }
@@ -1260,9 +1261,9 @@ void Tracking::UpdateLocalKeyFrames()
         return;
 
     int max=0;
-    KeyFrame* pKFmax= static_cast<KeyFrame*>(NULL);
+    KeyFrame* pKFmax= static_cast<KeyFrame*>(NULL); // -- Covisible keyframe with largest covisible map points number.
 
-    mvpLocalKeyFrames.clear();
+    mvpLocalKeyFrames.clear(); // -- Coivisble keyframes vector.
     mvpLocalKeyFrames.reserve(3*keyframeCounter.size());
 
     // All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
@@ -1293,14 +1294,13 @@ void Tracking::UpdateLocalKeyFrames()
 
         KeyFrame* pKF = *itKF;
 
-        const vector<KeyFrame*> vNeighs = pKF->GetBestCovisibilityKeyFrames(10);
-
+        const vector<KeyFrame*> vNeighs = pKF->GetBestCovisibilityKeyFrames(10); // -- Retrun 10 covisibility keyframes.
         for(vector<KeyFrame*>::const_iterator itNeighKF=vNeighs.begin(), itEndNeighKF=vNeighs.end(); itNeighKF!=itEndNeighKF; itNeighKF++)
         {
             KeyFrame* pNeighKF = *itNeighKF;
             if(!pNeighKF->isBad())
             {
-                if(pNeighKF->mnTrackReferenceForFrame!=mCurrentFrame.mnId)
+                if(pNeighKF->mnTrackReferenceForFrame!=mCurrentFrame.mnId) // -- Avoid replicates.
                 {
                     mvpLocalKeyFrames.push_back(pNeighKF);
                     pNeighKF->mnTrackReferenceForFrame=mCurrentFrame.mnId;
@@ -1309,7 +1309,7 @@ void Tracking::UpdateLocalKeyFrames()
             }
         }
 
-        const set<KeyFrame*> spChilds = pKF->GetChilds();
+        const set<KeyFrame*> spChilds = pKF->GetChilds(); // -- Spanning Tree child.
         for(set<KeyFrame*>::const_iterator sit=spChilds.begin(), send=spChilds.end(); sit!=send; sit++)
         {
             KeyFrame* pChildKF = *sit;
@@ -1324,7 +1324,7 @@ void Tracking::UpdateLocalKeyFrames()
             }
         }
 
-        KeyFrame* pParent = pKF->GetParent();
+        KeyFrame* pParent = pKF->GetParent(); // -- Spanning Tree parent.
         if(pParent)
         {
             if(pParent->mnTrackReferenceForFrame!=mCurrentFrame.mnId)
