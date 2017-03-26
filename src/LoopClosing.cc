@@ -200,7 +200,7 @@ bool LoopClosing::DetectLoop()
         }
 
         // If the group is not consistent with any previous group insert with consistency counter set to zero
-        if(!bConsistentForSomeGroup)
+        if(!bConsistentForSomeGroup) // -- If have not find any KF from spCandidateGroup in mvConsistentGroups, make spCandidateGroup itself a ConsistentGroup
         {
             ConsistentGroup cg = make_pair(spCandidateGroup,0);
             vCurrentConsistentGroups.push_back(cg);

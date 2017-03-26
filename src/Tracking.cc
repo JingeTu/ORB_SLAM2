@@ -938,7 +938,7 @@ bool Tracking::TrackLocalMap()
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
 
-    UpdateLocalMap(); // -- Find all covisible keyframe's map points(mvpLocalMapPoints).
+    UpdateLocalMap(); // -- Find all covisible keyframes' map points(mvpLocalMapPoints).
 
     SearchLocalPoints();
 
@@ -1179,13 +1179,13 @@ void Tracking::SearchLocalPoints()
             continue;
         // Project (this fills MapPoint variables for matching)
         if(mCurrentFrame.isInFrustum(pMP,0.5))
-        {
+        {// -- 0.5 is a cos, that is 60 degrees. Only when the frame center to map point ray intersect map point average normal with a angle less than 60 degrees will be considered in the frustum.
             pMP->IncreaseVisible();
             nToMatch++;
         }
     }
 
-    if(nToMatch>0)
+    if(nToMatch>0) // -- Replace(set??) mCurrentFrame.mvpMapPoints.
     {
         ORBmatcher matcher(0.8);
         int th = 1;
@@ -1205,7 +1205,7 @@ void Tracking::UpdateLocalMap()
 
     // Update
     UpdateLocalKeyFrames(); // -- Find candidate loop closing keyframes(mvpLocalKeyFrames).
-    UpdateLocalPoints(); // -- From mvpLocalKeyFrames extract all the map points.
+    UpdateLocalPoints(); // -- From mvpLocalKeyFrames extract all the map points to mvpLocalMapPoints.
 }
 
 void Tracking::UpdateLocalPoints()

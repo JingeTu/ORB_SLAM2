@@ -283,7 +283,7 @@ int Optimizer::PoseOptimization(Frame *pFrame)
         if(pMP)
         {
             // Monocular observation
-            if(pFrame->mvuRight[i]<0)
+            if(pFrame->mvuRight[i]<0) // -- Just initialized with -1.0
             {
                 nInitialCorrespondences++;
                 pFrame->mvbOutlier[i] = false;

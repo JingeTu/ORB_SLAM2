@@ -770,19 +770,23 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoin
 
     for (int level = 0; level < nlevels; ++level)
     {
+        // -- Caculate the border of extract area.
         const int minBorderX = EDGE_THRESHOLD-3;
         const int minBorderY = minBorderX;
         const int maxBorderX = mvImagePyramid[level].cols-EDGE_THRESHOLD+3;
         const int maxBorderY = mvImagePyramid[level].rows-EDGE_THRESHOLD+3;
 
+        // -- This level's keypoints.
         vector<cv::KeyPoint> vToDistributeKeys;
         vToDistributeKeys.reserve(nfeatures*10);
 
         const float width = (maxBorderX-minBorderX);
         const float height = (maxBorderY-minBorderY);
 
+        // -- Col and Row num.
         const int nCols = width/W;
         const int nRows = height/W;
+        // -- Width and Height one cell.
         const int wCell = ceil(width/nCols);
         const int hCell = ceil(height/nRows);
 
@@ -791,7 +795,7 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoin
             const float iniY =minBorderY+i*hCell;
             float maxY = iniY+hCell+6;
 
-            if(iniY>=maxBorderY-3)
+            if(iniY>=maxBorderY-6)
                 continue;
             if(maxY>maxBorderY)
                 maxY = maxBorderY;
@@ -809,16 +813,18 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoin
                 FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
                      vKeysCell,iniThFAST,true);
 
+                // -- If the threshold is too large, use a little less threshold.
                 if(vKeysCell.empty())
                 {
                     FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
                          vKeysCell,minThFAST,true);
                 }
 
+                // -- Add this cell's keypoints to the level kepoint vector.
                 if(!vKeysCell.empty())
                 {
                     for(vector<cv::KeyPoint>::iterator vit=vKeysCell.begin(); vit!=vKeysCell.end();vit++)
-                    {
+                    { // -- ATTENTION: Here set the minBorderX(minBorderY) as start index.
                         (*vit).pt.x+=j*wCell;
                         (*vit).pt.y+=i*hCell;
                         vToDistributeKeys.push_back(*vit);
